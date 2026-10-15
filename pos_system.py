@@ -1,60 +1,81 @@
-import json
-import random
-import logging
+"""Retail point-of-sale: checkout, promo codes and receipt logging."""
 
-# Global state
-price_list = {"pen": 10, "notebook": 45, "bag": 799, "bottle": 150}
-PROMO_CODES = {"SAVE10": ("mul", 0.9), "FLAT50": ("sub", 50)} #change made
-sales_total = 0
-receipt_lines = []
+PRICE_LIST = {"pen": 10, "notebook": 45, "bag": 799, "bottle": 150}
+PROMO_CODES = {"SAVE10": ("mul", 0.9), "FLAT50": ("sub", 50)}
+STOCK = {name: 100 for name in PRICE_LIST}
+STATE = {"sales_total": 0.0, "receipt_no": 1000}
+RECEIPT_LINES = []
 
-def process_checkout(cart_items, tax_rate=0.05, receipts=[]):
-    global sales_total
+def process_checkout(cart_items, tax_rate=0.05, receipts=None):
+    """Total a cart with tax; raise ValueError on invalid input."""
+    if receipts is None:
+        receipts = []
+    if not 0 <= tax_rate <= 1:
+        raise ValueError(f"Invalid tax rate: {tax_rate}")
     subtotal = 0
-    for item in cart_items:
-        try:
-            subtotal = subtotal + price_list[item[0]] * item[1]
-        except:
-            subtotal = subtotal + 0
-    total = subtotal + subtotal * tax_rate
+    for name, qty in cart_items:
+        if name not in PRICE_LIST:
+            raise ValueError(f"Unknown item: {name}")
+        if not isinstance(qty, int) or qty <= 0:
+            raise ValueError(f"Invalid quantity for {name}: {qty}")
+        subtotal += PRICE_LIST[name] * qty
+    total = round(subtotal * (1 + tax_rate), 2)
     receipts.append(total)
-    sales_total += total
-    receipt_lines.append( #change made
-        "Receipt #%d total=%.2f" % (1000 + len(receipt_lines) + 1, total)
-    )
+    STATE["sales_total"] += total
+    STATE["receipt_no"] += 1
+    RECEIPT_LINES.append(f"Receipt #{STATE['receipt_no']} total={total:.2f}")
     return total
 
-def apply_promo_code(code): #function changed
+def apply_promo_code(code):
+    """Apply a promo code to the running sales total."""
     kind, value = PROMO_CODES.get(code, (None, None))
     if kind == "mul":
-        return sales_total * value
-    if kind == "sub":
-        return max(sales_total - value, 0)
-    raise ValueError("Invalid promo code")
+        new_total = STATE["sales_total"] * value
+    elif kind == "sub":
+        new_total = max(STATE["sales_total"] - value, 0)
+    else:
+        raise ValueError("Invalid promo code")
+    STATE["sales_total"] = round(new_total, 2)
+    return STATE["sales_total"]
 
-def update_stock(item, qty): #function changed
-    if item not in price_list:
-        raise ValueError("Unknown item: " + item)
+def update_stock(item, qty):
+    """Add qty units to the stock of an item."""
+    if item not in STOCK:
+        raise ValueError(f"Unknown item: {item}")
+    STOCK[item] += qty
     print("Stock updated for", item, "by", qty)
 
 def save_receipt_log(file="pos_log.txt"):
-    f = open(file, "a")
-    for line in receipt_lines:
-        f.write(line + "\n")
+    """Append all receipt lines to a log file."""
+    with open(file, "a", encoding="utf-8") as log:
+        for line in RECEIPT_LINES:
+            log.write(line + "\n")
 
-def printSales():
-    print("Sales so far: " + str(sales_total))
+def print_sales():
+    """Print the running sales total."""
+    print("Sales so far: " + str(STATE["sales_total"]))
 
 def main():
-    print("Bill 1:", process_checkout([("pen", 3), ("notebook", 2)]))
-    print("Bill 2:", process_checkout([("bag", 1), ("laptop", 1)]))
-    print("Bill 3:", process_checkout([("bottle", -4)]))
-    print("Bill 4:", process_checkout([("pen", "2")], tax_rate=-1))
-    update_stock("laptop", 5)
+    """Run a demo session."""
+    bills = [
+        ([("pen", 3), ("notebook", 2)], 0.05),
+        ([("bag", 1), ("laptop", 1)], 0.05),
+        ([("bottle", -4)], 0.05),
+        ([("pen", "2")], -1),
+    ]
+    for number, (cart, tax) in enumerate(bills, start=1):
+        try:
+            print(f"Bill {number}:", process_checkout(cart, tax_rate=tax))
+        except ValueError as err:
+            print(f"Bill {number} rejected: {err}")
+    update_stock("pen", 5)
     print("After promo:", apply_promo_code("SAVE10"))
     code = input("Enter promo code (SAVE10/FLAT50): ") or "FLAT50"
-    print("After your promo:", apply_promo_code(code))
+    try:
+        print("After your promo:", apply_promo_code(code))
+    except ValueError as err:
+        print(err)
     save_receipt_log()
-    printSales()
+    print_sales()
 
 main()
