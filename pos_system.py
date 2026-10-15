@@ -6,6 +6,7 @@ STOCK = {name: 100 for name in PRICE_LIST}
 STATE = {"sales_total": 0.0, "receipt_no": 1000}
 RECEIPT_LINES = []
 
+
 def process_checkout(cart_items, tax_rate=0.05, receipts=None):
     """Total a cart with tax; raise ValueError on invalid input."""
     if receipts is None:
@@ -26,6 +27,7 @@ def process_checkout(cart_items, tax_rate=0.05, receipts=None):
     RECEIPT_LINES.append(f"Receipt #{STATE['receipt_no']} total={total:.2f}")
     return total
 
+
 def apply_promo_code(code):
     """Apply a promo code to the running sales total."""
     kind, value = PROMO_CODES.get(code, (None, None))
@@ -38,6 +40,7 @@ def apply_promo_code(code):
     STATE["sales_total"] = round(new_total, 2)
     return STATE["sales_total"]
 
+
 def update_stock(item, qty):
     """Add qty units to the stock of an item."""
     if item not in STOCK:
@@ -45,15 +48,18 @@ def update_stock(item, qty):
     STOCK[item] += qty
     print("Stock updated for", item, "by", qty)
 
+
 def save_receipt_log(file="pos_log.txt"):
     """Append all receipt lines to a log file."""
     with open(file, "a", encoding="utf-8") as log:
         for line in RECEIPT_LINES:
             log.write(line + "\n")
 
+
 def print_sales():
     """Print the running sales total."""
     print("Sales so far: " + str(STATE["sales_total"]))
+
 
 def main():
     """Run a demo session."""
@@ -78,4 +84,6 @@ def main():
     save_receipt_log()
     print_sales()
 
-main()
+
+if __name__ == "__main__":
+    main()
